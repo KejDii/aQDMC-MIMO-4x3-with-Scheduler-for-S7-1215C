@@ -1,0 +1,2782 @@
+﻿FUNCTION "MatrixFilled" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      lb_1 : DInt;
+      ub_1 : DInt;
+      lb_2 : DInt;
+      ub_2 : DInt;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+   END_VAR
+
+
+BEGIN
+	
+	
+	FOR #i := #lb_1 TO #ub_1 DO
+	    FOR #j := #lb_2 TO #ub_2 DO
+	        #C[#i, #j] := #val;
+	    END_FOR;
+	END_FOR;
+	
+	
+	
+END_FUNCTION
+
+DATA_BLOCK "Scheduler"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tm_break : Bool;
+      flag_global : DInt;
+      flag_iter : DInt;
+      time_start {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      time_bound : UDInt;
+      time_check {InstructionName := 'DTL'; LibVersion := '1.0'} : DTL;
+      time_duration : UDInt;
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "QDMCconfig"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      H : Int;
+      L : Int;
+      nV : Int;
+      kappa : Real;
+      prog_szumu : Real;
+      gamma : Real;
+      ro : Array[1..4, 1..1] of Real;
+      QDMC_init : Bool;
+      czy_pobudzenie : Bool;
+      U_max : Array[1..4, 1..1] of Real;
+      U_min : Array[1..4, 1..1] of Real;
+      dU_max : Array[1..4, 1..1] of Real;
+      dU_min : Array[1..4, 1..1] of Real;
+      Y_max : Array[1..3, 1..1] of Real;
+      Y_min : Array[1..3, 1..1] of Real;
+      solver_max_iter : Int;
+   END_VAR
+
+
+BEGIN
+   H := 20;
+   L := 1;
+   nV := 20;
+   kappa := 1.0;
+   prog_szumu := 0.5;
+   gamma := 0.01;
+   ro[1,1] := 20000.0;
+   ro[2,1] := 15000.0;
+   ro[3,1] := 15000.0;
+   ro[4,1] := 15000.0;
+   U_max[1,1] := 0.1;
+   U_max[2,1] := 0.6;
+   U_max[3,1] := 0.75;
+   U_max[4,1] := 0.8;
+   U_min[1,1] := 0.0;
+   U_min[2,1] := 0.0;
+   U_min[3,1] := 0.0;
+   U_min[4,1] := 0.0;
+   dU_max[1,1] := 0.04;
+   dU_max[2,1] := 0.1;
+   dU_max[3,1] := 0.1;
+   dU_max[4,1] := 0.1;
+   dU_min[1,1] := -0.04;
+   dU_min[2,1] := -0.1;
+   dU_min[3,1] := -0.1;
+   dU_min[4,1] := -0.1;
+   Y_max[1,1] := 30.0;
+   Y_max[2,1] := 30.0;
+   Y_max[3,1] := 30.0;
+   Y_min[1,1] := 0.0;
+   Y_min[2,1] := 0.0;
+   Y_min[3,1] := 0.0;
+   solver_max_iter := 20;
+
+END_DATA_BLOCK
+
+FUNCTION "MatrixIdentity" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      lb : DInt;
+      ub : DInt;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+   END_VAR
+
+
+BEGIN
+	
+	
+	"MatrixFilled"(lb_1 := #lb,
+	               ub_1 := #ub,
+	               lb_2 := #lb,
+	               ub_2 := #ub,
+	               val := 0.0,
+	               C => #C);
+	FOR #i := #lb TO #ub DO
+	    #C[#i, #i] := 1;
+	END_FOR;
+	
+	
+	
+END_FUNCTION
+
+DATA_BLOCK "QDMCInOut"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      u_in : Array[1..4, 1..1] of Real;
+      y_obiekt : Array[1..3, 1..1] of Real;
+      y_zad : Array[1..3, 1..1] of Real;
+      u_out : Array[1..4, 1..1] of Real;
+      y_model : Array[1..3, 1..1] of Real;
+   END_VAR
+
+
+BEGIN
+   y_zad[1,1] := 10.0;
+   y_zad[2,1] := 10.0;
+   y_zad[3,1] := 10.0;
+
+END_DATA_BLOCK
+
+FUNCTION "MatrixTranspose" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        FOR #i := #lb_2 TO #ub_2 DO
+	            FOR #j := #lb_1 TO #ub_1 DO
+	                #C[#i, #j] := #A[#j, #i];
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+DATA_BLOCK "QDMCmemory"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      u_all : Array[1..80, 1..1] of Real;
+      u_all_prim : Array[1..1, 1..80] of Real;
+      u : Array[1..4, 1..20, 1..1] of Real;
+      V : Array[1..12, 1..20, 1..1] of Real;
+      Theta : Array[1..3, 1..80, 1..1] of Real;
+      Theta_prim : Array[1..3, 1..1, 1..80] of Real;
+      y_hat : Array[1..3, 1..1, 1..1] of Real;
+      eps : Array[1..3, 1..1, 1..1] of Real;
+      V_diff : Array[1..3, 1..80, 1..1] of Real;
+      norm_u_sq : Array[1..1, 1..1] of Real;
+      rozrzut_u : Array[1..4, 1..1] of Real;
+      w : Array[1..3, 1..20, 1..1] of Real;
+      W_all : Array[1..60, 1..1] of Real;
+      Y0_all : Array[1..60, 1..1] of Real;
+      W_sub_Y0 : Array[1..60, 1..1] of Real;
+      dU_all : Array[1..76, 1..1] of Real;   // nu*H*(nV-1) x 1
+      S : Array[1..12, 1..20, 1..1] of Real;
+      M_work { ExternalWritable := 'False'} : Array[1..20, 1..1] of Real;
+      Mp_work : Array[1..20, 1..19] of Real;
+      Mp_all { ExternalWritable := 'False'} : Array[1..60, 1..76] of Real;   // ny*H x nu*(nV-1)
+      M_all : Array[1..60, 1..4] of Real;   // ny*H x nu*L
+      M_all_prim : Array[1..4, 1..60] of Real;
+      A_ineq : Array[1..22, 1..4] of Real;   // 4*nu*L + 2*ny*1 x nu*L
+      b_ineq : Array[1..22, 1..1] of Real;   // 4*nu*L + 2*ny*1 x 1
+      H_qp : Array[1..4, 1..4] of Real;   // nu*L x nu*L
+      R : Array[1..4, 1..4] of Real;
+      H_qp_inv : Array[1..4, 1..4] of Real;
+      c_qp : Array[1..4, 1..1] of Real;   // nu*L x 1
+      Temp_Hc : Array[1..4, 1..1] of Real;   // nu*L x 1
+      Ju : Array[1..4, 1..4] of Real;   // nu*L x nu*L
+      U_past_con : Array[1..4, 1..1] of Real;   // nu*L x 1
+      row_con_idx : Int;
+      P_mat : Array[1..22, 1..22] of Real;
+      d_vec : Array[1..22, 1..1] of Real;
+      lambda : Array[1..22, 1..1] of Real;
+      P_diag_inv : Array[1..22, 1..1] of Real;
+      temp_AH : Array[1..22, 1..4] of Real;
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "MatrixSubVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        FOR #i := #lb_1 TO #ub_1 DO
+	            FOR #j := #lb_2 TO #ub_2 DO
+	                #C[#i, #j] := #A[#i, #j] - #val;
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	
+END_FUNCTION
+
+FUNCTION "MatrixMulVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      status : Int;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        FOR #i := #lb_1 TO #ub_1 DO
+	            FOR #j := #lb_2 TO #ub_2 DO
+	                #C[#i, #j] := #A[#i, #j] * #val;
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "MatrixInvert" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+      lb : DInt;
+      ub : DInt;
+      maxInd : DInt;
+      tempVal : Real;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	
+	// WARNING 1: this function doesn't check whether the matrix is singular
+	
+	// WARNING 2: this function overwrites the matrix A. You need to create a copy
+	// if you wish to retain its values.
+	
+	// In this function, the A and C matrices are treated as if they are
+	// concatenated like this: [A C]. That means, for example, that if two rows are
+	// swapped, they're swapped in both matrices; or if elements of a row are 
+	// multiplied, they're also multiplied in both matrices.
+	// 
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #ub := UPPER_BOUND(ARR := #A, DIM := 1);
+	        // Check if A is a square array
+	        IF (#lb = LOWER_BOUND(ARR := #A, DIM := 2) AND
+	            #ub = UPPER_BOUND(ARR := #A, DIM := 2)) THEN
+	            // Initialize C as an identity matrix of the same size as A
+	            "MatrixIdentity"(lb := #lb,
+	                             ub := #ub,
+	                             C => #C);
+	            // Gaussian elimination with pivoting
+	            FOR #i := #lb TO #ub DO
+	                // Find the index of the maximum absolute value from the values of the
+	                // i-th column of the A array that are on or below the diagonal
+	                #maxInd := #i;
+	                FOR #j := #i + 1 TO #ub DO
+	                    IF (ABS(IN := #A[#j, #i]) > ABS(IN := #A[#maxInd, #i])) THEN
+	                        #maxInd := #j;
+	                    END_IF;
+	                END_FOR;
+	                // If the pivot is zero, the determinant will also be zero
+	                IF (ABS(#A[#maxInd, #i]) < 10 ** (-12)) THEN
+	                    RETURN;
+	                END_IF;
+	                
+	                // If the pivot (#A[#maxInd, #i]) is not on the diagonal, swap rows so
+	                // that it is
+	                IF #maxInd <> #i THEN
+	                    FOR #j := #lb TO #ub DO
+	                        #tempVal := #A[#maxInd, #j];
+	                        #A[#maxInd, #j] := #A[#i, #j]; // #A changed
+	                        #A[#i, #j] := #tempVal; // #A changed
+	                        #tempVal := #C[#maxInd, #j];
+	                        #C[#maxInd, #j] := #C[#i, #j];
+	                        #C[#i, #j] := #tempVal;
+	                    END_FOR;
+	                END_IF;
+	                
+	                // Normalize i-th row according to the pivot
+	                #tempVal := #A[#i, #i];
+	                FOR #j := #lb TO #ub DO
+	                    #A[#i, #j] := #A[#i, #j] / #tempVal; // #A changed
+	                    #C[#i, #j] := #C[#i, #j] / #tempVal;
+	                END_FOR;
+	                
+	                // Subtract a multiple of one row from another to zero other elements
+	                // in the i-th column
+	                FOR #j := #lb TO #ub DO
+	                    IF (#i <> #j) THEN
+	                        #tempVal := #A[#j, #i] / #A[#i, #i];
+	                        FOR #k := #lb TO #ub DO
+	                            #A[#j, #k] := #A[#j, #k] - #tempVal * #A[#i, #k]; // #A changed
+	                            #C[#j, #k] := #C[#j, #k] - #tempVal * #C[#i, #k];
+	                        END_FOR;
+	                    END_IF;
+	                END_FOR;
+	            END_FOR;
+	        ELSE
+	            "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	            RETURN;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "MatrixSub" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        IF (#lb_1 = LOWER_BOUND(ARR := #B, DIM := 1) AND
+	            #lb_2 = LOWER_BOUND(ARR := #B, DIM := 2) AND
+	            #ub_1 = UPPER_BOUND(ARR := #B, DIM := 1) AND
+	            #ub_2 = UPPER_BOUND(ARR := #B, DIM := 2)) THEN
+	            FOR #i := #lb_1 TO #ub_1 DO
+	                FOR #j := #lb_2 TO #ub_2 DO
+	                    #C[#i, #j] := #A[#i, #j] - #B[#i, #j];
+	                END_FOR;
+	            END_FOR;
+	        ELSE
+	            "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	            RETURN;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "build_M" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      S : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      M_out : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      k : Int;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        
+	        FOR #i := 1 TO "QDMCconfig".H DO
+	            FOR #k := 1 TO "QDMCconfig".L DO
+	                #M_out[#i, #k] := 0.0;
+	            END_FOR;
+	        END_FOR;
+	        
+	        FOR #i := 1 TO "QDMCconfig".L DO
+	            FOR #k := #i TO "QDMCconfig".H DO
+	                #M_out[#k, #i] := #S[#k - #i + 1, 1];
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "MatrixAddVal" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      val : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        FOR #i := #lb_1 TO #ub_1 DO
+	            FOR #j := #lb_2 TO #ub_2 DO
+	                #C[#i, #j] := #A[#i, #j] + #val;
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "MatrixAdd" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      lb_1 : DInt;
+      lb_2 : DInt;
+      ub_1 : DInt;
+      ub_2 : DInt;
+      time_check : Time;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        IF (#lb_1 = LOWER_BOUND(ARR := #B, DIM := 1) AND
+	            #lb_2 = LOWER_BOUND(ARR := #B, DIM := 2) AND
+	            #ub_1 = UPPER_BOUND(ARR := #B, DIM := 1) AND
+	            #ub_2 = UPPER_BOUND(ARR := #B, DIM := 2)) THEN
+	            FOR #i := #lb_1 TO #ub_1 DO
+	                FOR #j := #lb_2 TO #ub_2 DO
+	                    #C[#i, #j] := #A[#i, #j] + #B[#i, #j];
+	                END_FOR;
+	            END_FOR;
+	        ELSE
+	            "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	            RETURN;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "build_Mp" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      S : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      Mp_out : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      k : Int;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        
+	        FOR #i := 1 TO "QDMCconfig".H DO
+	            FOR #j := 1 TO ("QDMCconfig".nV - 1) DO
+	                #Mp_out[#i, #j] := 0.0;
+	            END_FOR;
+	        END_FOR;
+	        
+	        FOR #i := 1 TO "QDMCconfig".H DO
+	            FOR #j := 1 TO ("QDMCconfig".nV - 1) DO
+	                IF (#i + #j) <= "QDMCconfig".nV THEN
+	                    #Mp_out[#i, #j] := #S[#i + #j, 1] - #S[#j, 1];
+	                ELSE
+	                    #Mp_out[#i, #j] := #S["QDMCconfig".nV, 1] - #S[#j, 1];
+	                END_IF;
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "MatrixMul" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      status : Int;
+      k : DInt;
+      lb_a_1 : DInt;
+      lb_a_2 : DInt;
+      ub_a_1 : DInt;
+      ub_a_2 : DInt;
+      lb_b_1 : DInt;
+      lb_b_2 : DInt;
+      ub_b_1 : DInt;
+      ub_b_2 : DInt;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        #lb_a_1 := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #lb_a_2 := LOWER_BOUND(ARR := #A, DIM := 2);
+	        #ub_a_1 := UPPER_BOUND(ARR := #A, DIM := 1);
+	        #ub_a_2 := UPPER_BOUND(ARR := #A, DIM := 2);
+	        #lb_b_2 := LOWER_BOUND(ARR := #B, DIM := 2);
+	        #ub_b_2 := UPPER_BOUND(ARR := #B, DIM := 2);
+	        IF (#lb_a_2 = LOWER_BOUND(ARR := #B, DIM := 1) AND
+	            #ub_a_2 = UPPER_BOUND(ARR := #B, DIM := 1)) THEN
+	            "MatrixFilled"(lb_1 := #lb_a_1,
+	                           lb_2 := #lb_b_2,
+	                           ub_1 := #ub_a_1,
+	                           ub_2 := #ub_b_2,
+	                           val := 0,
+	                           C => #C);
+	            
+	            FOR #i := #lb_a_1 TO #ub_a_1 DO
+	                FOR #j := #lb_b_2 TO #ub_b_2 DO
+	                    FOR #k := #lb_a_2 TO #ub_a_2 DO
+	                        #C[#i, #j] := #C[#i, #j] + #A[#i, #k] * #B[#k, #j];
+	                    END_FOR;
+	                END_FOR;
+	            END_FOR;
+	        ELSE
+	            "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	            RETURN;
+	        END_IF;
+	        
+	        
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "referenceUpdate" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      a : Real;
+      i : Int;
+      j : Int;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	//wpisanie wartości zadanej i rozciągnięcie na cały horyzont
+	//parametr 'a' odpowiada za zbocze ewentualnej inercji (0 - skok, im większa wartość tym gładsza zmiana wartości ref)
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        #a := 0.0;
+	        "zapisy".sp_curr[1] := 0.1 * 100.0;
+	        IF "time_tracking" > 3000.0 THEN
+	            "zapisy".sp_curr[1] := 0.2 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 5000.0 THEN
+	            "zapisy".sp_curr[1] := 0.04 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 7000.0 THEN
+	            "zapisy".sp_curr[1] := 0.10 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 12500.0 THEN
+	            "zapisy".sp_curr[1] := 0.25 * 100.0;
+	        END_IF;
+	        
+	        "zapisy".sp_curr[2] := 0.1 * 100.0;
+	        IF "time_tracking" > 3000.0 THEN
+	            "zapisy".sp_curr[2] := 0.04 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 5000.0 THEN
+	            "zapisy".sp_curr[2] := 0.25 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 7000.0 THEN
+	            "zapisy".sp_curr[2] := 0.2 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 9000.0 THEN
+	            "zapisy".sp_curr[2] := 0.25 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 11000.0 THEN
+	            "zapisy".sp_curr[2] := 0.17 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 12500.0 THEN
+	            "zapisy".sp_curr[2] := 0.05 * 100.0;
+	        END_IF;
+	        
+	        "zapisy".sp_curr[3] := 0.1 * 100.0;
+	        IF "time_tracking" > 3000.0 THEN
+	            "zapisy".sp_curr[3] := 0.04 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 5000.0 THEN
+	            "zapisy".sp_curr[3] := 0.25 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 7000.0 THEN
+	            "zapisy".sp_curr[3] := 0.15 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 10000.0 THEN
+	            "zapisy".sp_curr[3] := 0.1 * 100.0;
+	        END_IF;
+	        IF "time_tracking" > 12500.0 THEN
+	            "zapisy".sp_curr[3] := 0.25 * 100.0;
+	        END_IF;
+	        
+	        "QDMCInOut".y_zad[1, 1] := #a * "QDMCInOut".y_zad[1, 1] + (1.0 - #a) * "zapisy".sp_curr[1];
+	        "QDMCInOut".y_zad[2, 1] := #a * "QDMCInOut".y_zad[2, 1] + (1.0 - #a) * "zapisy".sp_curr[2];
+	        "QDMCInOut".y_zad[3, 1] := #a * "QDMCInOut".y_zad[3, 1] + (1.0 - #a) * "zapisy".sp_curr[3];
+	        
+	        "zapisy".curr_w[1] := "QDMCInOut".y_zad[1, 1];
+	        "zapisy".curr_w[2] := "QDMCInOut".y_zad[2, 1];
+	        "zapisy".curr_w[3] := "QDMCInOut".y_zad[3, 1];
+	        
+	        FOR #i := 1 TO "QDMCconfig".H DO
+	            "zapisy".pred_time := "time_tracking" + (INT_TO_REAL(#i) * 8.0);
+	            
+	            "zapisy".sp_pred[1] := 0.1 * 100.0;
+	            IF "zapisy".pred_time > 3000.0 THEN
+	                "zapisy".sp_pred[1] := 0.2 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 5000.0 THEN
+	                "zapisy".sp_pred[1] := 0.04 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 7000.0 THEN
+	                "zapisy".sp_pred[1] := 0.10 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 12500.0 THEN
+	                "zapisy".sp_pred[1] := 0.25 * 100.0;
+	            END_IF;
+	            
+	            "zapisy".sp_pred[2] := 0.1 * 100.0;
+	            IF "zapisy".pred_time > 3000.0 THEN
+	                "zapisy".sp_pred[2] := 0.04 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 5000.0 THEN
+	                "zapisy".sp_pred[2] := 0.25 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 7000.0 THEN
+	                "zapisy".sp_pred[2] := 0.2 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 9000.0 THEN
+	                "zapisy".sp_pred[2] := 0.25 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 11000.0 THEN
+	                "zapisy".sp_pred[2] := 0.17 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 12500.0 THEN
+	                "zapisy".sp_pred[2] := 0.05 * 100.0;
+	            END_IF;
+	            
+	            "zapisy".sp_pred[3] := 0.1 * 100.0;
+	            IF "zapisy".pred_time > 3000.0 THEN
+	                "zapisy".sp_pred[3] := 0.04 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 5000.0 THEN
+	                "zapisy".sp_pred[3] := 0.25 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 7000.0 THEN
+	                "zapisy".sp_pred[3] := 0.15 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 10000.0 THEN
+	                "zapisy".sp_pred[3] := 0.1 * 100.0;
+	            END_IF;
+	            IF "zapisy".pred_time > 12500.0 THEN
+	                "zapisy".sp_pred[3] := 0.25 * 100.0;
+	            END_IF;
+	            
+	            "zapisy".curr_w[1] := #a * "zapisy".curr_w[1] + (1.0 - #a) * "zapisy".sp_pred[1];
+	            "zapisy".curr_w[2] := #a * "zapisy".curr_w[2] + (1.0 - #a) * "zapisy".sp_pred[2];
+	            "zapisy".curr_w[3] := #a * "zapisy".curr_w[3] + (1.0 - #a) * "zapisy".sp_pred[3];
+	            
+	            "QDMCmemory".w[1, #i, 1] := "zapisy".curr_w[1];
+	            "QDMCmemory".w[2, #i, 1] := "zapisy".curr_w[2];
+	            "QDMCmemory".w[3, #i, 1] := "zapisy".curr_w[3];
+	            
+	        END_FOR;
+	        FOR #i := 1 TO 3 DO
+	            FOR #j := 1 TO "QDMCconfig".H DO
+	                "QDMCmemory".W_all[(#i - 1) * "QDMCconfig".H + #j, 1] := "QDMCmemory".w[#i, #j, 1];
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "Y0_pred" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      status : Int;
+      k : Int;
+      Y0_temp : Array[1..60, 1..1] of Real;
+   END_VAR
+
+
+BEGIN
+	//Y0=Y0_all+ Mp_all*dUall;
+	"MatrixMul"(A := "QDMCmemory".Mp_all,
+	            B := "QDMCmemory".dU_all,
+	            C => "QDMCmemory".Y0_all);
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        FOR #i := 1 TO 3 DO
+	            FOR #j := 1 TO "QDMCconfig".H DO
+	                "QDMCmemory".Y0_all[(#i - 1) * "QDMCconfig".H + #j, 1] := "QDMCmemory".Y0_all[(#i - 1) * "QDMCconfig".H + #j, 1] + "QDMCInOut".y_obiekt[#i, 1];
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	
+	
+	
+	
+	
+	
+END_FUNCTION
+
+FUNCTION "SOLVERconstraints" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      u : Int;
+      r : Int;
+      c : Int;
+      offset : Int;
+      nu_L : Int;
+      ny_H : Int;
+      status : Int;
+      target_row : Int;
+   END_VAR
+
+
+BEGIN
+	#nu_L := 4 * "QDMCconfig".L; //nu * L
+	#ny_H := 3 * "QDMCconfig".H; //ny * H
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        //ulozenie macierzy trójkątnej
+	        FOR #u := 1 TO 4 DO //nu
+	            #offset := (#u - 1) * "QDMCconfig".L;
+	            FOR #r := 1 TO "QDMCconfig".L DO
+	                FOR #c := 1 TO #r DO
+	                    "QDMCmemory".Ju[#offset + #r, #offset + #c] := 1.0;
+	                END_FOR;
+	            END_FOR;
+	        END_FOR;
+	        //przypisanie U_past_con
+	        FOR #i := 1 TO 4 DO //nu
+	            FOR #j := 1 TO "QDMCconfig".L DO
+	                "QDMCmemory".U_past_con[(#i - 1) * "QDMCconfig".L + #j, 1] := "QDMCInOut".u_in[#i, 1];
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        //dU to zmienne decyzyjne
+	        "QDMCmemory".row_con_idx := 0;
+	        // --- 1. Blok: Ju * dU <= U_max - U_past ---
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCmemory".row_con_idx := "QDMCmemory".row_con_idx + 1;
+	            FOR #j := 1 TO #nu_L DO
+	                "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := "QDMCmemory".Ju[#i, #j];
+	            END_FOR;
+	            "QDMCmemory".b_ineq["QDMCmemory".row_con_idx, 1] := "QDMCconfig".U_max[#i, 1] - "QDMCmemory".U_past_con[#i, 1];
+	        END_FOR;
+	        
+	        // --- 2. Blok: -Ju * dU <= -U_min + U_past ---
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCmemory".row_con_idx := "QDMCmemory".row_con_idx + 1;
+	            FOR #j := 1 TO #nu_L DO
+	                "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := - "QDMCmemory".Ju[#i, #j];
+	            END_FOR;
+	            "QDMCmemory".b_ineq["QDMCmemory".row_con_idx, 1] := - "QDMCconfig".U_min[#i, 1] + "QDMCmemory".U_past_con[#i, 1];
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // --- 3. Blok: I * dU <= dU_max ---
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCmemory".row_con_idx := "QDMCmemory".row_con_idx + 1;
+	            FOR #j := 1 TO #nu_L DO
+	                IF #i = #j THEN
+	                    "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := 1.0;
+	                ELSE
+	                    "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := 0.0;
+	                END_IF;
+	            END_FOR;
+	            "QDMCmemory".b_ineq["QDMCmemory".row_con_idx, 1] := "QDMCconfig".dU_max[#i, 1];
+	        END_FOR;
+	        
+	        // --- 4. Blok: -I * dU <= -dU_min ---
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCmemory".row_con_idx := "QDMCmemory".row_con_idx + 1;
+	            FOR #j := 1 TO #nu_L DO
+	                IF #i = #j THEN
+	                    "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := -1.0;
+	                ELSE
+	                    "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := 0.0;
+	                END_IF;
+	            END_FOR;
+	            "QDMCmemory".b_ineq["QDMCmemory".row_con_idx, 1] := - "QDMCconfig".dU_min[#i, 1];
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // --- 5. Blok: Ograniczenie GÓRNE (Y <= Y_max) TYLKO dla końca horyzontu ---
+	        FOR #i := 1 TO 3 DO //ny
+	            "QDMCmemory".row_con_idx := "QDMCmemory".row_con_idx + 1;
+	            
+	            // Wyliczamy wiersz odpowiadający końcowi horyzontu dla i-tego wyjścia
+	            // Dla H=20: wyjście 1 -> wiersz 20, wyjście 2 -> wiersz 40, wyjście 3 -> wiersz 60
+	            #target_row := #i * "QDMCconfig".H;
+	            
+	            FOR #j := 1 TO #nu_L DO
+	                "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := "QDMCmemory".M_all[#target_row, #j];
+	            END_FOR;
+	            
+	            // Pobieramy limit z końca wektora referencyjnego i odejmujemy wartość swobodną
+	            "QDMCmemory".b_ineq["QDMCmemory".row_con_idx, 1] := "QDMCconfig".Y_max[#i, 1] - "QDMCmemory".Y0_all[#target_row, 1];
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // --- 6. Blok: Ograniczenie DOLNE (-Y <= -Y_min) TYLKO dla końca horyzontu ---
+	        FOR #i := 1 TO 3 DO //ny
+	            "QDMCmemory".row_con_idx := "QDMCmemory".row_con_idx + 1;
+	            
+	            #target_row := #i * "QDMCconfig".H;
+	            
+	            FOR #j := 1 TO #nu_L DO
+	                "QDMCmemory".A_ineq["QDMCmemory".row_con_idx, #j] := - "QDMCmemory".M_all[#target_row, #j];
+	            END_FOR;
+	            
+	            "QDMCmemory".b_ineq["QDMCmemory".row_con_idx, 1] := - "QDMCconfig".Y_min[#i, 1] + "QDMCmemory".Y0_all[#target_row, 1];
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "SOLVER" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      k : Int;
+      iter : Int;
+      m : Int;
+      nu_L : Int;
+      status : Int;
+      sum_val : Real;
+      w : Real;
+   END_VAR
+
+
+BEGIN
+	#m := 22;    // Liczba ograniczeń
+	#nu_L := 4;   // Wymiar wektora decyzji (nu * L)
+	
+	//H_qp
+	"MatrixTranspose"(A := "QDMCmemory".M_all,
+	                  C => "QDMCmemory".M_all_prim);
+	"MatrixMul"(A := "QDMCmemory".M_all_prim,
+	            B := "QDMCmemory".M_all,
+	            C => "QDMCmemory".H_qp);
+	"MatrixAdd"(A := "QDMCmemory".H_qp,
+	            B := "QDMCmemory".R,
+	            C => "QDMCmemory".H_qp);
+	"MatrixMulVal"(A := "QDMCmemory".H_qp,
+	               C => "QDMCmemory".H_qp,
+	               val := 2.0);
+	//c_qp
+	"MatrixSub"(A := "QDMCmemory".W_all,
+	            B := "QDMCmemory".Y0_all,
+	            C => "QDMCmemory".W_sub_Y0);
+	"MatrixMul"(A := "QDMCmemory".M_all_prim,
+	            B := "QDMCmemory".W_sub_Y0,
+	            C => "QDMCmemory".c_qp);
+	"MatrixMulVal"(A := "QDMCmemory".c_qp,
+	               C => "QDMCmemory".c_qp,
+	               val := -2.0);
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // ====================================================================
+	        // ETAP 1: Zabezpieczenie przed osobliwością (Regularyzacja)
+	        // ====================================================================
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCmemory".H_qp[#i, #i] := "QDMCmemory".H_qp[#i, #i] + 1.0e-6;
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	
+	"MatrixInvert"(A := "QDMCmemory".H_qp,
+	               C => "QDMCmemory".H_qp_inv);
+	
+	// ====================================================================
+	// ETAP 2: Przekształcenie do problemu dualnego
+	// ====================================================================
+	
+	// A) Obliczanie temp_Hc = H_inv * c_qp (Wymiar: 4x1)
+	"MatrixMul"(A := "QDMCmemory".H_qp_inv,
+	            B := "QDMCmemory".c_qp,
+	            C => "QDMCmemory".Temp_Hc);
+	
+	// B) Obliczanie d_vec = A_ineq * temp_Hc + b_ineq (Wymiar: 22x1)
+	"MatrixMul"(A := "QDMCmemory".A_ineq,
+	            B := "QDMCmemory".Temp_Hc,
+	            C => "QDMCmemory".d_vec);
+	"MatrixAdd"(A := "QDMCmemory".d_vec,
+	            B := "QDMCmemory".b_ineq,
+	            C => "QDMCmemory".d_vec);
+	
+	// C) Obliczanie temp_AH = A_ineq * H_inv (Wymiar: 22x4)
+	"MatrixMul"(A := "QDMCmemory".A_ineq,
+	            B := "QDMCmemory".H_qp_inv,
+	            C => "QDMCmemory".temp_AH);
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // D) Obliczanie P_mat = temp_AH * A_ineq^T (Wymiar: 22x22)
+	        // Zamiast fizycznie transponować A_ineq, po prostu zamieniamy indeksy [j, k] na [k, j]
+	        FOR #i := 1 TO #m DO
+	            FOR #j := 1 TO #m DO
+	                "QDMCmemory".P_mat[#i, #j] := 0.0;
+	                FOR #k := 1 TO #nu_L DO
+	                    "QDMCmemory".P_mat[#i, #j] := "QDMCmemory".P_mat[#i, #j] +
+	                    ("QDMCmemory".temp_AH[#i, #k] * "QDMCmemory".A_ineq[#j, #k]);
+	                END_FOR;
+	            END_FOR;
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // ====================================================================
+	        // ETAP 3: Inicjalizacja Solvera Hildretha
+	        // ====================================================================
+	        
+	        FOR #i := 1 TO #m DO
+	            "QDMCmemory".lambda[#i, 1] := 0.0; // Zerowanie lambda na starcie każdej próbki
+	            
+	            // Zabezpieczenie przed dzieleniem przez zero na przekątnej P
+	            IF "QDMCmemory".P_mat[#i, #i] > 1.0e-12 THEN
+	                "QDMCmemory".P_diag_inv[#i, 1] := 1.0 / "QDMCmemory".P_mat[#i, #i];
+	            ELSE
+	                "QDMCmemory".P_diag_inv[#i, 1] := 0.0;
+	            END_IF;
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // ====================================================================
+	        // ETAP 4: Główna Pętla Iteracyjna (Algorytm Hildretha)
+	        // ====================================================================
+	        
+	        FOR #iter := 1 TO "QDMCconfig".solver_max_iter DO // Na PLC ustaw bezpiecznie np. na 30 - 50
+	            FOR #i := 1 TO #m DO
+	                #sum_val := 0.0;
+	                
+	                FOR #j := 1 TO #m DO
+	                    IF #i <> #j THEN
+	                        #sum_val := #sum_val + ("QDMCmemory".P_mat[#i, #j] * "QDMCmemory".lambda[#j, 1]);
+	                    END_IF;
+	                END_FOR;
+	                
+	                #w := - ("QDMCmemory".d_vec[#i, 1] + #sum_val) * "QDMCmemory".P_diag_inv[#i, 1];
+	                
+	                IF #w < 0.0 THEN
+	                    "QDMCmemory".lambda[#i, 1] := 0.0;
+	                ELSE
+	                    "QDMCmemory".lambda[#i, 1] := #w;
+	                END_IF;
+	                
+	            END_FOR;
+	        END_FOR;
+	        
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // ====================================================================
+	        // ETAP 5: Rekonstrukcja rozwiązania pierwotnego (optDU = -H_inv * (c_qp + A_ineq^T * lambda))
+	        // ====================================================================
+	        
+	        // A) Oblicz temp_Hc (ponownie, używamy jako bufora dla: c_qp + A_ineq^T * lambda)
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCmemory".Temp_Hc[#i, 1] := "QDMCmemory".c_qp[#i, 1];
+	            FOR #j := 1 TO #m DO
+	                "QDMCmemory".Temp_Hc[#i, 1] := "QDMCmemory".Temp_Hc[#i, 1] +
+	                ("QDMCmemory".A_ineq[#j, #i] * "QDMCmemory".lambda[#j, 1]);
+	            END_FOR;
+	        END_FOR;
+	        
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        // B) Końcowe mnożenie: optDU = -H_inv * temp_Hc / zapisuję optDU do u_out a potem dodam u_in (ostatnie sterowanie)
+	        FOR #i := 1 TO #nu_L DO
+	            "QDMCInOut".u_out[#i, 1] := 0.0;
+	            FOR #j := 1 TO #nu_L DO
+	                "QDMCInOut".u_out[#i, 1] := "QDMCInOut".u_out[#i, 1] -
+	                ("QDMCmemory".H_qp_inv[#i, #j] * "QDMCmemory".Temp_Hc[#j, 1]);
+	            END_FOR;
+	        END_FOR;
+	        
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "build_Matrices" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      r : Int;
+      c : Int;
+      out_idx : Int;
+      in_idx : Int;
+      target_row : Int;
+      target_col : Int;
+      Mp_cols : Int;
+   END_VAR
+
+
+BEGIN
+	//budowanie M_all
+	FOR #i := 1 TO 12 DO
+	    "build_M"(M_out => "QDMCmemory".M_work,
+	              S := "QDMCmemory".S[#i]);
+	    //jeżeli nie ma breaka, to przepisz M_work do M_all w odpowiednie miejsce
+	    IF NOT "Scheduler".tm_break THEN
+	        //tutaj złożenie odpowiedniego kawałka M_all
+	        // Dla i = 1..4: (i-1)/4 = 0 (Wyjście 1)
+	        // Dla i = 5..8: (i-1)/4 = 1 (Wyjście 2)
+	        // Dla i = 9..12:(i-1)/4 = 2 (Wyjście 3)
+	        #out_idx := (#i - 1) / 4;
+	        #in_idx := (#i - 1) MOD 4;
+	        FOR #r := 1 TO "QDMCconfig".H DO
+	            FOR #c := 1 TO "QDMCconfig".L DO
+	                
+	                // Obliczenie finalnych, fizycznych indeksów (1-based)
+	                #target_row := (#out_idx * "QDMCconfig".H) + #r;
+	                #target_col := (#in_idx * "QDMCconfig".L) + #c;
+	                
+	                "QDMCmemory".M_all[#target_row, #target_col] := "QDMCmemory".M_work[#r, #c];
+	                
+	            END_FOR;
+	        END_FOR;
+	        
+	    END_IF;
+	END_FOR;
+	//budowanie Mp_all
+	FOR #i := 1 TO 12 DO
+	    "build_Mp"(Mp_out => "QDMCmemory".Mp_work,
+	               S := "QDMCmemory".S[#i]);
+	    //jeżeli nie ma breaka, to przepisz M_work do M_all w odpowiednie miejsce
+	    IF NOT "Scheduler".tm_break THEN
+	        //tutaj złożenie odpowiedniego kawałka Mp_all
+	        #Mp_cols := "QDMCconfig".nV - 1;
+	        #out_idx := (#i - 1) / 4;
+	        #in_idx := (#i - 1) MOD 4;
+	        FOR #r := 1 TO "QDMCconfig".H DO
+	            
+	            FOR #c := 1 TO #Mp_cols DO
+	                // Obliczenie finalnych, fizycznych indeksów (1-based)
+	                #target_row := (#out_idx * "QDMCconfig".H) + #r;
+	                // Skok co 19 kolumn (zamiast co L)
+	                #target_col := (#in_idx * #Mp_cols) + #c;
+	                
+	                "QDMCmemory".Mp_all[#target_row, #target_col] := "QDMCmemory".Mp_work[#r, #c];
+	                
+	            END_FOR;
+	        END_FOR;
+	    END_IF;
+	END_FOR;
+END_FUNCTION
+
+FUNCTION "QDMCprep" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      k : Int;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	//ułożenie DU
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        FOR #i := 1 TO 4 DO
+	            FOR #j := 1 TO "QDMCconfig".nV - 1 DO
+	                "QDMCmemory".dU_all[(#i - 1) * ("QDMCconfig".nV - 1) + #j, 1] := -"QDMCmemory".u[#i, #j + 1, 1] + "QDMCmemory".u[#i, #j, 1];
+	            END_FOR;
+	        END_FOR;
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	// impulse response -> step response
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        FOR #i := 1 TO 12 DO
+	            "QDMCmemory".S[#i, 1, 1] := "QDMCmemory".V[#i, 1, 1];
+	            FOR #j := 2 TO "QDMCconfig".nV DO
+	                "QDMCmemory".S[#i, #j, 1] := "QDMCmemory".S[#i, #j-1, 1]+"QDMCmemory".V[#i, #j, 1];
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        FOR #i := 1 TO 4 * "QDMCconfig".L DO
+	            FOR #j := 1 TO 4 * "QDMCconfig".L DO
+	                "QDMCmemory".R[#i, #j] := 0.0;
+	            END_FOR;
+	        END_FOR;
+	        
+	        //macierz R
+	        FOR #i := 1 TO 4 DO
+	            FOR #j := 1 TO "QDMCconfig".L DO
+	                "QDMCmemory".R[(#i - 1) * "QDMCconfig".L + #j, (#i - 1) * "QDMCconfig".L + #j] := "QDMCconfig".ro[#i, 1];
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
+FUNCTION "QDMCinit" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+   END_VAR
+
+
+BEGIN
+	//inicjalizacja parametrami
+	IF "QDMCconfig".QDMC_init = FALSE THEN
+	    // --- Wyjście 1 ---
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[1, #i, 1] := LREAL_TO_REAL(0.1456 * 100.0) - (#i - 1) * LREAL_TO_REAL(7.5361e-4 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[1, 1, 1] := 0.4457 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[2, #i, 1] := LREAL_TO_REAL(0.0117 * 100.0) - (#i - 1) * LREAL_TO_REAL(7.9391e-5 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[2, 1, 1] := 0.0357 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[3, #i, 1] := 0;
+	    END_FOR;
+	    "QDMCmemory".V[3, 1, 1] := 0;
+	    
+	    FOR #i := 1 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[4, #i, 1] := 0;
+	    END_FOR;
+	    "QDMCmemory".V[4, 1, 1] := 0;
+	    
+	    // --- Wyjście 2 ---
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[5, #i, 1] := LREAL_TO_REAL(0.0063 * 100.0) - (#i - 1) * LREAL_TO_REAL(-5.6997e-4 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[5, 1, 1] := 0.0084 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[6, #i, 1] := LREAL_TO_REAL(-0.0141 * 100.0) - (#i - 1) * LREAL_TO_REAL(-1.814e-4 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[6, 1, 1] := -0.0437 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[7, #i, 1] := LREAL_TO_REAL(0.0178 * 100.0) - (#i - 1) * LREAL_TO_REAL(1.2682e-4 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[7, 1, 1] := 0.0548 * 100.0;
+	    
+	    FOR #i := 1 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[8, #i, 1] := 0;
+	    END_FOR;
+	    "QDMCmemory".V[8, 1, 1] := 0;
+	    
+	    // --- Wyjście 3 ---
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[9, #i, 1] := LREAL_TO_REAL(7.5742e-5 * 100.0) - (#i - 1) * LREAL_TO_REAL(-1.4134e-4 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[9, 1, 1] := 5.329e-5 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[10, #i, 1] := LREAL_TO_REAL(-3.4661e-4 * 100.0) - (#i - 1) * LREAL_TO_REAL(5.9564e-5 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[10, 1, 1] := -4.5155e-4 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[11, #i, 1] := LREAL_TO_REAL(-0.0134 * 100.0) - (#i - 1) * LREAL_TO_REAL(-1.0119e-4 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[11, 1, 1] := -0.041 * 100.0;
+	    
+	    FOR #i := 2 TO "QDMCconfig".nV DO
+	        "QDMCmemory".V[12, #i, 1] := LREAL_TO_REAL(0.0181 * 100.0) - (#i - 1) * LREAL_TO_REAL(7.3415e-5 * 100.0);
+	    END_FOR;
+	    "QDMCmemory".V[12, 1, 1] := 0.0550 * 100.0;
+	    "QDMCconfig".QDMC_init := TRUE;
+	END_IF;
+END_FUNCTION
+
+FUNCTION "QDMCadapt" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      k : Int;
+      status : Int;
+      Temp_min : Real;
+      Temp_max : Real;
+   END_VAR
+
+
+BEGIN
+	//algorytm gradientowy do adaptacji parametrów modeli
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        //shift u
+	        FOR #j := 1 TO 4 DO
+	            FOR #i := 1 TO "QDMCconfig".nV - 1 DO
+	                "QDMCmemory".u[#j, "QDMCconfig".nV + 1 - #i, 1] := "QDMCmemory".u[#j, "QDMCconfig".nV - #i, 1];
+	            END_FOR;
+	        END_FOR;
+	        "QDMCmemory".u[1, 1, 1] := "QDMCInOut".u_in[1, 1];
+	        "QDMCmemory".u[2, 1, 1] := "QDMCInOut".u_in[2, 1];
+	        "QDMCmemory".u[3, 1, 1] := "QDMCInOut".u_in[3, 1];
+	        "QDMCmemory".u[4, 1, 1] := "QDMCInOut".u_in[4, 1];
+	        //ułożenie U_all
+	        FOR #j := 1 TO 4 DO
+	            FOR #i := 1 TO "QDMCconfig".nV DO
+	                "QDMCmemory".u_all[(#j - 1) * "QDMCconfig".nV + #i, 1] := "QDMCmemory".u[#j, #i, 1];
+	            END_FOR;
+	        END_FOR;
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	"MatrixTranspose"(A := "QDMCmemory".u_all,
+	                  C => "QDMCmemory".u_all_prim);
+	
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        //ułożenie Thet
+	        FOR #j := 1 TO 3 DO
+	            FOR #k := 1 TO 4 DO
+	                FOR #i := 1 TO "QDMCconfig".nV DO
+	                    "QDMCmemory".Theta[#j, (#k - 1) * "QDMCconfig".nV + #i, 1] := "QDMCmemory".V[(#j - 1) * 4 + #k, #i, 1];
+	                END_FOR;
+	            END_FOR;
+	        END_FOR;
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	"MatrixTranspose"(A := "QDMCmemory".Theta[1],
+	                  C => "QDMCmemory".Theta_prim[1]);
+	"MatrixTranspose"(A := "QDMCmemory".Theta[2],
+	                  C => "QDMCmemory".Theta_prim[2]);
+	"MatrixTranspose"(A := "QDMCmemory".Theta[3],
+	                  C => "QDMCmemory".Theta_prim[3]);
+	
+	//predykcja modelu
+	"MatrixMul"(A := "QDMCmemory".Theta_prim[1],
+	            B := "QDMCmemory".u_all,
+	            C => "QDMCmemory".y_hat[1]);
+	"MatrixMul"(A := "QDMCmemory".Theta_prim[2],
+	            B := "QDMCmemory".u_all,
+	            C => "QDMCmemory".y_hat[2]);
+	"MatrixMul"(A := "QDMCmemory".Theta_prim[3],
+	            B := "QDMCmemory".u_all,
+	            C => "QDMCmemory".y_hat[3]);
+	
+	//eps
+	"MatrixSubVal"(A := "QDMCmemory".y_hat[1],
+	               C => "QDMCmemory".eps[1],
+	               val := "QDMCInOut".y_obiekt[1, 1]);
+	"MatrixSubVal"(A := "QDMCmemory".y_hat[2],
+	               C => "QDMCmemory".eps[2],
+	               val := "QDMCInOut".y_obiekt[2, 1]);
+	"MatrixSubVal"(A := "QDMCmemory".y_hat[3],
+	               C => "QDMCmemory".eps[3],
+	               val := "QDMCInOut".y_obiekt[3, 1]);
+	
+	//norm u sq
+	"MatrixMul"(A := "QDMCmemory".u_all_prim,
+	            B := "QDMCmemory".u_all,
+	            C => "QDMCmemory".norm_u_sq);
+	
+	"MatrixAddVal"(A := "QDMCmemory".norm_u_sq,
+	               C => "QDMCmemory".norm_u_sq,
+	               val := "QDMCconfig".kappa);
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        //rozrzuty
+	        "QDMCconfig".czy_pobudzenie := FALSE;
+	        FOR #j := 1 TO 4 DO
+	            #Temp_max := "QDMCmemory".u[#j, 1, 1];
+	            #Temp_min := "QDMCmemory".u[#j, 1, 1];
+	            FOR #i := 2 TO "QDMCconfig".nV DO 
+	                IF "QDMCmemory".u[#j, #i, 1] > #Temp_max THEN
+	                    #Temp_max := "QDMCmemory".u[#j, #i, 1];
+	                END_IF;
+	                IF "QDMCmemory".u[#j, #i, 1] < #Temp_min THEN
+	                    #Temp_min := "QDMCmemory".u[#j, #i, 1];
+	                END_IF;
+	            END_FOR;
+	            "QDMCmemory".rozrzut_u[#j, 1] := #Temp_max - #Temp_min;
+	            IF "QDMCmemory".rozrzut_u[#j, 1] > 0.01 THEN
+	                "QDMCconfig".czy_pobudzenie := TRUE;
+	            END_IF;
+	        END_FOR;
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+	//update
+	"MatrixMulVal"(A := "QDMCmemory".u_all,
+	               C => "QDMCmemory".V_diff[1],
+	               val := "QDMCconfig".gamma * "QDMCmemory".eps[1, 1, 1] / "QDMCmemory".norm_u_sq[1, 1]);
+	"MatrixMulVal"(A := "QDMCmemory".u_all,
+	               C => "QDMCmemory".V_diff[2],
+	               val := "QDMCconfig".gamma * "QDMCmemory".eps[2, 1, 1] / "QDMCmemory".norm_u_sq[1, 1]);
+	"MatrixMulVal"(A := "QDMCmemory".u_all,
+	               C => "QDMCmemory".V_diff[3],
+	               val := "QDMCconfig".gamma * "QDMCmemory".eps[3, 1, 1] / "QDMCmemory".norm_u_sq[1, 1]);
+	
+	IF ABS("QDMCmemory".eps[1, 1, 1]) > "QDMCconfig".prog_szumu AND "QDMCconfig".czy_pobudzenie THEN
+	    "MatrixSub"(A := "QDMCmemory".Theta[1],
+	                B := "QDMCmemory".V_diff[1],
+	                C => "QDMCmemory".Theta[1]);
+	END_IF;
+	
+	IF ABS("QDMCmemory".eps[2, 1, 1]) > "QDMCconfig".prog_szumu AND "QDMCconfig".czy_pobudzenie THEN
+	    "MatrixSub"(A := "QDMCmemory".Theta[2],
+	                B := "QDMCmemory".V_diff[2],
+	                C => "QDMCmemory".Theta[2]);
+	END_IF;
+	
+	IF ABS("QDMCmemory".eps[3, 1, 1]) > "QDMCconfig".prog_szumu AND "QDMCconfig".czy_pobudzenie THEN
+	    "MatrixSub"(A := "QDMCmemory".Theta[3],
+	                B := "QDMCmemory".V_diff[3],
+	                C => "QDMCmemory".Theta[3]);
+	END_IF;
+	
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        //rozpakowanie parametrów
+	        FOR #i := 1 TO 3 DO
+	            FOR #j := 1 TO 4 DO
+	                FOR #k := 1 TO "QDMCconfig".nV DO
+	                    "QDMCmemory".V[(#i - 1) * 4 + #j, #k, 1] := "QDMCmemory".Theta[#i, (#j - 1) * "QDMCconfig".nV + #k, 1];
+	                END_FOR;
+	            END_FOR;
+	        END_FOR;
+	        // Wymuszenie zer na wybranych torach 
+	        FOR #k := 1 TO "QDMCconfig".nV DO
+	            "QDMCmemory".V[3, #k, 1] := 0.0; // param31
+	            "QDMCmemory".V[4, #k, 1] := 0.0; // param41
+	            "QDMCmemory".V[8, #k, 1] := 0.0; // param42
+	        END_FOR;
+	        
+	        
+	        
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+FUNCTION "QDMC" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      i : Int;
+      j : Int;
+      k : Int;
+      r : Int;
+      c : Int;
+      status : Int;
+      Temp_max : Real;
+      Temp_min : Real;
+      a : Real;
+   END_VAR
+
+
+BEGIN
+	"QDMCinit"();
+	"QDMCadapt"();
+	"referenceUpdate"();
+	"QDMCprep"();
+	"build_Matrices"();
+	"Y0_pred"();
+	"SOLVERconstraints"();
+	"SOLVER"();
+	
+	//przypisanie sterowań -> dU + u z poprzedniej iteracji
+	//if there is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        //rozpakowanie dU i aktualizacja wyjścia (wzorowane na u_in + dU)
+	        "QDMCInOut".u_out[1, 1] := "QDMCInOut".u_out[1, 1] + "QDMCInOut".u_in[1, 1];
+	        "QDMCInOut".u_out[2, 1] := "QDMCInOut".u_out[2, 1] + "QDMCInOut".u_in[2, 1];
+	        "QDMCInOut".u_out[3, 1] := "QDMCInOut".u_out[3, 1] + "QDMCInOut".u_in[3, 1];
+	        "QDMCInOut".u_out[4, 1] := "QDMCInOut".u_out[4, 1] + "QDMCInOut".u_in[4, 1];
+	    ELSE
+	        "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	        RETURN;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+END_FUNCTION
+
+FUNCTION "SchedulerInit" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	#status := RD_LOC_T("Scheduler".time_start);
+	"Scheduler".flag_global := 0;
+	
+	
+	
+END_FUNCTION
+
+FUNCTION "MatrixConcat" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+      B : Array[*, *] of Real;
+      dim : UDInt;
+   END_VAR
+
+   VAR_OUTPUT 
+      C : Array[*, *] of Real;
+   END_VAR
+
+   VAR_TEMP 
+      consistentDim : UDInt;
+      i : DInt;
+      j : DInt;
+      lb_consistent : DInt;
+      ub_consistent : DInt;
+      lb_a_inconsistent : DInt;
+      ub_a_inconsistent : DInt;
+      lb_b_inconsistent : DInt;
+      ub_b_inconsistent : DInt;
+      n : DInt;
+      status : Int;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        IF (#dim = 1) THEN
+	            #consistentDim := 2;
+	        ELSIF (#dim = 2) THEN
+	            #consistentDim := 1;
+	        ELSE
+	            RETURN;
+	        END_IF;
+	        
+	        IF (LOWER_BOUND(ARR := #A, DIM := #consistentDim) = LOWER_BOUND(ARR := #B, DIM := #consistentDim) AND
+	            UPPER_BOUND(ARR := #A, DIM := #consistentDim) = UPPER_BOUND(ARR := #B, DIM := #consistentDim)) THEN
+	            #lb_consistent := LOWER_BOUND(ARR := #A, DIM := #consistentDim);
+	            #ub_consistent := UPPER_BOUND(ARR := #A, DIM := #consistentDim);
+	            #lb_a_inconsistent := LOWER_BOUND(ARR := #A, DIM := #dim);
+	            #ub_a_inconsistent := UPPER_BOUND(ARR := #A, DIM := #dim);
+	            #lb_b_inconsistent := LOWER_BOUND(ARR := #B, DIM := #dim);
+	            #ub_b_inconsistent := UPPER_BOUND(ARR := #B, DIM := #dim);
+	            #n := #ub_b_inconsistent - #lb_b_inconsistent + 1;
+	            IF (#dim = 1) THEN
+	                FOR #i := #lb_a_inconsistent TO #ub_a_inconsistent DO
+	                    FOR #j := #lb_consistent TO #ub_consistent DO
+	                        #C[#i, #j] := #A[#i, #j];
+	                    END_FOR;
+	                END_FOR;
+	                FOR #i := 1 TO #n DO
+	                    FOR #j := #lb_consistent TO #ub_consistent DO
+	                        #C[#ub_a_inconsistent + #i, #j] := #B[#lb_b_inconsistent + #i - 1, #j];
+	                    END_FOR;
+	                END_FOR;
+	            ELSIF (#dim = 2) THEN
+	                FOR #i := #lb_consistent TO #ub_consistent DO
+	                    FOR #j := #lb_a_inconsistent TO #ub_a_inconsistent DO
+	                        #C[#i, #j] := #A[#i, #j];
+	                    END_FOR;
+	                END_FOR;
+	                FOR #i := #lb_consistent TO #ub_consistent DO
+	                    FOR #j := 1 TO #n DO
+	                        #C[#i, #ub_a_inconsistent + #j] := #B[#i, #lb_b_inconsistent + #j - 1];
+	                    END_FOR;
+	                END_FOR;
+	            END_IF;
+	        ELSE
+	            RETURN;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+	
+END_FUNCTION
+
+FUNCTION "MatrixDet" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      A : Array[*, *] of Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      det : Real;
+   END_VAR
+
+   VAR_TEMP 
+      i : DInt;
+      j : DInt;
+      k : DInt;
+      lb : DInt;
+      ub : DInt;
+      n : DInt;
+      maxInd : DInt;
+      sign : Int;
+      status : Int;
+      tempVal : Real;
+   END_VAR
+
+
+BEGIN
+	
+	//if rhere is no break or this is the correct function
+	IF (NOT "Scheduler".tm_break) OR ("Scheduler".tm_break AND "Scheduler".flag_iter = "Scheduler".flag_global) THEN
+	    //correct function -> cancel the break
+	    IF "Scheduler".tm_break THEN
+	        "Scheduler".tm_break := FALSE;
+	    END_IF;
+	    
+	    //local flag = global flag
+	    "Scheduler".flag_iter := "Scheduler".flag_global;
+	    
+	    //time check
+	    #status := RD_LOC_T("Scheduler".time_check);
+	    IF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND + 1 THEN
+	        "Scheduler".time_duration := 1_000_000_000 + "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    ELSIF "Scheduler".time_check.SECOND = "Scheduler".time_start.SECOND THEN
+	        "Scheduler".time_duration := "Scheduler".time_check.NANOSECOND - "Scheduler".time_start.NANOSECOND;
+	    END_IF;
+	    
+	    //if computation time is too long then make a break
+	    IF "Scheduler".time_duration > "Scheduler".time_bound THEN
+	        "Scheduler".tm_break := TRUE;
+	    END_IF;
+	    
+	    //if there is no break - compute normally
+	    IF NOT "Scheduler".tm_break THEN
+	        
+	        
+	        #lb := LOWER_BOUND(ARR := #A, DIM := 1);
+	        #ub := UPPER_BOUND(ARR := #A, DIM := 1);
+	        // Check if A is a square array
+	        IF (#lb = LOWER_BOUND(ARR := #A, DIM := 2) AND
+	            #ub = UPPER_BOUND(ARR := #A, DIM := 2)) THEN
+	            #n := #ub - #lb;
+	            IF #n = 1 THEN
+	                #det := #A[#lb, #lb];
+	            ELSIF #n = 2 THEN
+	                #det := #A[#lb, #lb] * #A[#ub, #ub] - #A[#lb, #ub] * #A[#ub, #lb];
+	            ELSE
+	                #det := 1.0;
+	                #sign := 1;
+	                // Use Gaussian elimination with pivoting to obtain the upper
+	                // triangular form
+	                FOR #i := #lb TO #ub DO
+	                    // Find the index of the maximum absolute value from the values of
+	                    // the i-th column of the A array that are on or below the diagonal
+	                    #maxInd := #i;
+	                    FOR #j := #i + 1 TO #ub DO
+	                        IF (ABS(IN := #A[#j, #i]) > ABS(IN := #A[#maxInd, #i])) THEN
+	                            #maxInd := #j;
+	                        END_IF;
+	                    END_FOR;
+	                    // If the pivot is zero, the determinant will also be zero
+	                    IF (ABS(#A[#maxInd, #i]) < 10 ** (-12)) THEN
+	                        #det := 0.0;
+	                        EXIT;
+	                    END_IF;
+	                    
+	                    // If the pivot (#A[#maxInd, #i]) is not on the diagonal, swap rows
+	                    // so that it is and change the sign
+	                    IF #maxInd <> #i THEN
+	                        FOR #j := #lb TO #ub DO
+	                            #tempVal := #A[#maxInd, #j];
+	                            #A[#maxInd, #j] := #A[#i, #j]; // #A changed only locally
+	                            #A[#i, #j] := #tempVal; // #A changed only locally
+	                        END_FOR;
+	                        #sign := - #sign;
+	                    END_IF;
+	                    
+	                    // Subtract a multiple of one row from another to zero elements in the
+	                    // i-th column that are below the diagonal
+	                    FOR #j := #i + 1 TO #ub DO
+	                        #tempVal := #A[#j, #i] / #A[#i, #i];
+	                        FOR #k := #lb TO #ub DO
+	                            #A[#j, #k] := #A[#j, #k] - #tempVal * #A[#i, #k]; // #A changed only locally
+	                        END_FOR;
+	                    END_FOR;
+	                END_FOR;
+	                
+	                IF (#det <> 0) THEN
+	                    FOR #i := #lb TO #ub DO
+	                        #det := #det * #A[#i, #i];
+	                    END_FOR;
+	                    #det := #det * INT_TO_REAL(#sign);
+	                END_IF;
+	            END_IF;
+	        ELSE
+	            "Scheduler".flag_global := "Scheduler".flag_global + 1;
+	            RETURN;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	//iterate global flag
+	"Scheduler".flag_global := "Scheduler".flag_global + 1;
+	
+END_FUNCTION
+
